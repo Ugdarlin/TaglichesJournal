@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tägliches Journal PWA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4A90E2">
+    <style>
+        /* Custom styles */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .form-container, .entries-container, .actions-container, .notifications-container { /* Added notifications-container */
+            @apply bg-white p-6 rounded-lg shadow-md mb-6;
+        }
+        .btn {
+            @apply px-4 py-2 rounded-md font-semibold text-white shadow-sm transition-colors duration-150;
+        }
+        .btn-primary {
+            @apply bg-blue-500 hover:bg-blue-600;
+        }
+        .btn-secondary {
+            @apply bg-green-500 hover:bg-green-600;
+        }
+        .btn-neutral { /* Added neutral button style */
+            @apply bg-gray-500 hover:bg-gray-600;
+        }
+        .entry-card {
+            @apply bg-gray-50 p-4 rounded-md mb-4 shadow;
+        }
+        .entry-card h3 {
+            @apply text-xl font-semibold text-blue-700 mb-2;
+        }
+        .entry-card h4 {
+            @apply text-md font-semibold text-gray-700 mt-3 mb-1;
+        }
+        .entry-card p {
+            @apply text-sm text-gray-600 mb-1;
+        }
+        .entry-card ul {
+            @apply list-disc list-inside pl-4 text-sm text-gray-600;
+        }
+        #message-box {
+            @apply fixed top-5 right-5 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-md shadow-lg z-50;
+            display: none;
+        }
+        #message-box.error {
+            @apply bg-red-100 border-red-400 text-red-700;
+        }
+        #message-box.info {
+            @apply bg-blue-100 border-blue-400 text-blue-700;
+        }
+        .slider-container {
+            @apply flex items-center space-x-2;
+        }
+        .slider-container input[type="range"] {
+            @apply flex-grow;
+        }
+        .slider-container output {
+            @apply w-10 text-center text-sm font-medium text-gray-700;
+        }
+        .hidden-section {
+            display: none;
+            @apply mt-3 p-3 border border-gray-200 rounded-md bg-gray-50;
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center py-8 px-4">
+
+    <div class="w-full max-w-3xl">
+        <header class="mb-8 text-center">
+            <h1 class="text-4xl font-bold text-gray-800">Tägliches Journal</h1>
+            <p class="text-gray-600">Protokollieren Sie täglich Ihre Gedanken, Aktivitäten und Ihr Befinden.</p>
+        </header>
+
+        <div id="message-box"></div>
+
+        <div class="notifications-container">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Benachrichtigungen</h2>
+            <p id="notificationStatus" class="text-sm text-gray-600 mb-3">Status: Unbekannt</p>
+            <button id="enableNotificationsBtn" class="btn btn-neutral">Tägliche Erinnerungen Aktivieren</button>
+        </div>
+
+        <div class="form-container">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-5">Heutiger Eintrag</h2>
+            <form id="dailyForm" class="space-y-5">
+                <div>
+                    <label for="entryDate" class="block text-sm font-medium text-gray-700 mb-1">Datum:</label>
+                    <input type="date" id="entryDate" name="entryDate" required
+                           class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                </div>
+
+                <div>
+                    <label for="stimmung" class="block text-sm font-medium text-gray-700">1. Wie würden Sie Ihre aktuelle Stimmung gerade beschreiben?</label>
+                    <span class="text-xs text-gray-500">(0=sehr schlecht, 100=sehr gut)</span>
+                    <div class="slider-container mt-1">
+                        <input type="range" id="stimmung" name="stimmung" min="0" max="100" value="50" class="w-full">
+                        <output for="stimmung">50</output>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="energieniveau" class="block text-sm font-medium text-gray-700">2. Wie würden Sie Ihr Energieniveau gerade beschreiben?</label>
+                    <span class="text-xs text-gray-500">(0=sehr erschöpft/ausgelaugt, 100=total energiegeladen)</span>
+                    <div class="slider-container mt-1">
+                        <input type="range" id="energieniveau" name="energieniveau" min="0" max="100" value="50" class="w-full">
+                        <output for="energieniveau">50</output>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="koerperlichesWohlbefinden" class="block text-sm font-medium text-gray-700">3. Wie würden Sie Ihr körperliches Wohlbefinden gerade beschreiben?</label>
+                    <span class="text-xs text-gray-500">(0=sehr schlecht, 100=sehr gut)</span>
+                    <div class="slider-container mt-1">
+                        <input type="range" id="koerperlichesWohlbefinden" name="koerperlichesWohlbefinden" min="0" max="100" value="50" class="w-full">
+                        <output for="koerperlichesWohlbefinden">50</output>
+                    </div>
+                </div>
+                
+                <div>
+                    <label for="nervositaet" class="block text-sm font-medium text-gray-700">4. Wie nervös fühlen Sie sich gerade?</label>
+                     <span class="text-xs text-gray-500">(0=gar nicht, 100=extrem)</span>
+                    <div class="slider-container mt-1">
+                        <input type="range" id="nervositaet" name="nervositaet" min="0" max="100" value="0" class="w-full">
+                        <output for="nervositaet">0</output>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="unruhe" class="block text-sm font-medium text-gray-700">5. Wie unruhig fühlen Sie sich gerade?</label>
+                    <span class="text-xs text-gray-500">(0=gar nicht, 100=extrem)</span>
+                    <div class="slider-container mt-1">
+                        <input type="range" id="unruhe" name="unruhe" min="0" max="100" value="0" class="w-full">
+                        <output for="unruhe">0</output>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="traurigkeit" class="block text-sm font-medium text-gray-700">6. Wie traurig fühlen Sie sich gerade?</label>
+                    <span class="text-xs text-gray-500">(0=gar nicht, 100=extrem)</span>
+                    <div class="slider-container mt-1">
+                        <input type="range" id="traurigkeit" name="traurigkeit" min="0" max="100" value="0" class="w-full">
+                        <output for="traurigkeit">0</output>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="einsamkeit" class="block text-sm font-medium text-gray-700">7. Wie einsam fühlen Sie sich gerade?</label>
+                    <span class="text-xs text-gray-500">(0=gar nicht, 100=extrem)</span>
+                    <div class="slider-container mt-1">
+                        <input type="range" id="einsamkeit" name="einsamkeit" min="0" max="100" value="0" class="w-full">
+                        <output for="einsamkeit">0</output>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">8. Haben Sie seit der letzten Befragung bestimmte Situationen vermieden?</label>
+                    <div class="mt-2 space-x-4">
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="situationenVermieden" value="ja" class="form-radio text-blue-600">
+                            <span class="ml-2">Ja</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="situationenVermieden" value="nein" class="form-radio text-blue-600" checked>
+                            <span class="ml-2">Nein</span>
+                        </label>
+                    </div>
+                    <div id="vermiedenDetails" class="hidden-section mt-2">
+                        <label for="vermiedenWelche" class="block text-sm font-medium text-gray-700">Wenn ja, welche?</label>
+                        <textarea id="vermiedenWelche" name="vermiedenWelche" rows="2" placeholder="Beschreiben Sie die vermiedenen Situationen..."
+                                  class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">9. Hatten Sie seit der letzten Befragung einen Panikanfall erlebt?</label>
+                    <div class="mt-2 space-x-4">
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="panikanfallErlebt" value="ja" class="form-radio text-blue-600">
+                            <span class="ml-2">Ja</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="panikanfallErlebt" value="nein" class="form-radio text-blue-600" checked>
+                            <span class="ml-2">Nein</span>
+                        </label>
+                    </div>
+                    <div id="panikDetails" class="hidden-section mt-2 space-y-3">
+                        <div>
+                            <label for="panikBeginn" class="block text-sm font-medium text-gray-700">a. Wenn ja, zu welcher Zeit fing er ungefähr an?</label>
+                            <input type="time" id="panikBeginn" name="panikBeginn"
+                                   class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="panikEnde" class="block text-sm font-medium text-gray-700">b. Wann hörte er ungefähr auf?</label>
+                            <input type="time" id="panikEnde" name="panikEnde"
+                                   class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="panikIntensitaet" class="block text-sm font-medium text-gray-700">c. Wie hoch würden Sie die Intensität des Panikanfalls einschätzen? (0-100)</label>
+                            <div class="slider-container mt-1">
+                                <input type="range" id="panikIntensitaet" name="panikIntensitaet" min="0" max="100" value="0" class="w-full">
+                                 <output for="panikIntensitaet">0</output>
+                            </div>
+                        </div>
+                         <div>
+                            <label class="block text-sm font-medium text-gray-700">d. Bitte kreuzen Sie die Symptome an, die Sie während des Panikanfalls erlebt haben:</label>
+                            <div id="panikSymptomeCheckboxesContainer" class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                </div>
+                        </div>
+                        <div>
+                            <label for="panikSituation" class="block text-sm font-medium text-gray-700">e. Bitte beschreiben Sie die Situation, in der der Panikanfall auftrat, genauer:</label>
+                            <textarea id="panikSituation" name="panikSituation" rows="3" placeholder="z.B. alleine oder mit anderen, privater oder öffentlicher Raum..."
+                                      class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                        </div>
+                        <div>
+                            <label for="panikAusloeser" class="block text-sm font-medium text-gray-700">f. Was glauben Sie hat Ihren Panikanfall ausgelöst?</label>
+                            <textarea id="panikAusloeser" name="panikAusloeser" rows="3" placeholder="Mögliche Auslöser..."
+                                      class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-full !mt-8">Eintrag Speichern</button>
+            </form>
+        </div>
+
+        <div class="actions-container text-center">
+             <h2 class="text-2xl font-semibold text-gray-700 mb-4">Daten Verwalten</h2>
+            <button id="downloadData" class="btn btn-secondary">Alle Einträge Herunterladen (JSON)</button>
+        </div>
+
+        <div class="entries-container">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Vergangene Einträge</h2>
+            <div id="entriesList" class="space-y-4">
+                <p class="text-gray-500">Noch keine Einträge vorhanden. Füllen Sie das Formular aus, um zu beginnen!</p>
+            </div>
+        </div>
+    </div>
+
+    <footer class="mt-8 text-center text-sm text-gray-500">
+        <p>&copy; <span id="currentYear"></span> Tägliches Journal PWA. Alle Rechte vorbehalten.</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
