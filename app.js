@@ -1,5 +1,3 @@
-// File: app.js
-
 // --- Database Setup ---
 const DB_NAME = 'DailyFormsDB';
 const STORE_NAME = 'entries';
@@ -11,15 +9,18 @@ let db;
 function initDB() {
     console.log('Initializing database...');
     return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, 2);
+        // No version change needed if schema itself isn't changing, only display logic
+        const request = indexedDB.open(DB_NAME, 4); 
 
         request.onupgradeneeded = (event) => {
             db = event.target.result;
+            let store;
             if (!db.objectStoreNames.contains(STORE_NAME)) {
-                const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
                 store.createIndex('date', 'date', { unique: false });
                 console.log('Object store "entries" created.');
             } else {
+                store = event.target.transaction.objectStore(STORE_NAME);
                 console.log('Object store "entries" already exists.');
             }
         };
@@ -38,11 +39,12 @@ function initDB() {
     });
 }
 
-// --- Form Data & Symptoms ---
+// --- Form Data & Elements ---
 const dailyForm = document.getElementById('dailyForm');
 const entryDateField = document.getElementById('entryDate');
+const anzahlPanikattackenSelect = document.getElementById('anzahlPanikattacken');
+const panikattackenBerichteContainer = document.getElementById('panikattackenBerichteContainer');
 
-// Define symptoms for panic attacks
 const PANIC_SYMPTOMS = [
     {id: "symBrustschmerzen", label: "Schmerzen oder Beschwerden in der Brust"},
     {id: "symSchwindel", label: "Schwindel, Unsicherheit, Benommenheit oder der Ohnmacht nahe"},
@@ -68,33 +70,6 @@ function escapeHTML(str) {
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[match];
     });
 }
-
-/**
- * Generates and injects symptom checkboxes into the DOM.
- */
-function generateSymptomCheckboxes() {
-    console.log('Attempting to generate symptom checkboxes...');
-    const container = document.getElementById('panikSymptomeCheckboxesContainer');
-    if (!container) {
-        console.error('Symptom checkbox container (panikSymptomeCheckboxesContainer) not found in HTML!');
-        return;
-    }
-    console.log('Symptom checkbox container found:', container);
-
-    let checkboxesHTML = '';
-    PANIC_SYMPTOMS.forEach(symptom => {
-        checkboxesHTML += `
-            <label class="inline-flex items-center">
-                <input type="checkbox" name="panikSymptome" value="${symptom.id}" class="form-checkbox text-blue-600 rounded">
-                <span class="ml-2 text-sm">${escapeHTML(symptom.label)}</span>
-            </label>
-        `;
-    });
-    // console.log('Generated checkboxes HTML:', checkboxesHTML); // Optional: can be very verbose
-    container.innerHTML = checkboxesHTML;
-    console.log('Symptom checkboxes generated and injected.');
-}
-
 
 /**
  * Sets the default date for the form to today.
@@ -131,19 +106,34 @@ async function addEntry(event) {
         unruhe: dailyForm.unruhe.value,
         traurigkeit: dailyForm.traurigkeit.value,
         einsamkeit: dailyForm.einsamkeit.value,
+        schlafStart: dailyForm.schlafStart.value,
+        schlafEnde: dailyForm.schlafEnde.value,
+        schlafQualitaet: dailyForm.schlafQualitaet.value,
+        schlafAufgewacht: dailyForm.schlafAufgewacht.value,
         situationenVermieden: dailyForm.situationenVermieden.value,
         vermiedenWelche: dailyForm.situationenVermieden.value === 'ja' ? dailyForm.vermiedenWelche.value : '',
-        panikanfallErlebt: dailyForm.panikanfallErlebt.value,
+        anzahlPanikattacken: dailyForm.anzahlPanikattacken.value,
+        panikattackenDetails: [],
         submittedAt: new Date().toISOString()
     };
 
-    if (newEntry.panikanfallErlebt === 'ja') {
-        newEntry.panikBeginn = dailyForm.panikBeginn.value;
-        newEntry.panikEnde = dailyForm.panikEnde.value;
-        newEntry.panikIntensitaet = dailyForm.panikIntensitaet.value;
-        newEntry.panikSymptome = Array.from(dailyForm.querySelectorAll('input[name="panikSymptome"]:checked')).map(cb => cb.value);
-        newEntry.panikSituation = dailyForm.panikSituation.value;
-        newEntry.panikAusloeser = dailyForm.panikAusloeser.value;
+    const numPanicAttacks = parseInt(dailyForm.anzahlPanikattacken.value, 10);
+    const effectiveNumPanicAttacks = numPanicAttacks >= 4 ? 4 : numPanicAttacks;
+
+    if (effectiveNumPanicAttacks > 0) {
+        for (let i = 1; i <= effectiveNumPanicAttacks; i++) {
+            const detail = {
+                beginn: document.getElementById(`panikBeginn_${i}`)?.value || '',
+                ende: document.getElementById(`panikEnde_${i}`)?.value || '',
+                intensitaet: document.getElementById(`panikIntensitaet_${i}`)?.value || '0',
+                symptome: [],
+                situation: document.getElementById(`panikSituation_${i}`)?.value || '',
+                ausloeser: document.getElementById(`panikAusloeser_${i}`)?.value || ''
+            };
+            const symptomCheckboxes = document.querySelectorAll(`input[name="panikSymptome_${i}"]:checked`);
+            symptomCheckboxes.forEach(cb => detail.symptome.push(cb.value));
+            newEntry.panikattackenDetails.push(detail);
+        }
     }
 
     const transaction = db.transaction([STORE_NAME], 'readwrite');
@@ -156,20 +146,25 @@ async function addEntry(event) {
         dailyForm.reset();
         setDefaultDate();
         document.getElementById('vermiedenDetails').style.display = 'none';
-        document.getElementById('panikDetails').style.display = 'none';
+        anzahlPanikattackenSelect.value = "0";
+        panikattackenBerichteContainer.innerHTML = '';
+        panikattackenBerichteContainer.style.display = 'none';
+
         document.querySelectorAll('.slider-container output').forEach(output => {
             const slider = document.getElementById(output.htmlFor);
             if (slider) {
-                 if (['panikIntensitaet', 'nervositaet', 'unruhe', 'traurigkeit', 'einsamkeit'].includes(slider.id)) {
+                 if (['nervositaet', 'unruhe', 'traurigkeit', 'einsamkeit'].includes(slider.id) || slider.id.startsWith('panikIntensitaet_')) {
                     slider.value = slider.defaultValue || '0';
                     output.value = slider.defaultValue || '0';
+                } else if (slider.id === 'schlafQualitaet') {
+                    slider.value = '75';
+                    output.value = '75';
                 } else {
                     slider.value = slider.defaultValue || '50';
                     output.value = slider.defaultValue || '50';
                 }
             }
         });
-        document.querySelectorAll('input[name="panikSymptome"]').forEach(checkbox => checkbox.checked = false);
         displayEntries();
     };
 
@@ -193,7 +188,7 @@ async function displayEntries() {
     const getAllRequest = store.getAll();
 
     getAllRequest.onsuccess = () => {
-        entriesListDiv.innerHTML = '';
+        entriesListDiv.innerHTML = ''; // Clear existing entries
         const entries = getAllRequest.result;
 
         if (entries.length === 0) {
@@ -201,40 +196,30 @@ async function displayEntries() {
             return;
         }
 
-        entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+        entries.sort((a, b) => new Date(b.date) - new Date(a.date)); // Sort by date descending
 
         entries.forEach(entry => {
             const entryCard = document.createElement('div');
             entryCard.className = 'entry-card';
+
             const entryDate = new Date(entry.date);
             const displayDate = entryDate.toLocaleDateString('de-DE', { year: 'numeric', month: 'long', day: 'numeric' });
+            const submissionTime = new Date(entry.submittedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
-            let panikDetailsHTML = '';
-            if (entry.panikanfallErlebt === 'ja') {
-                const symptomeLabels = entry.panikSymptome && entry.panikSymptome.length > 0
-                    ? entry.panikSymptome.map(symptomId => {
-                        const symptomObj = PANIC_SYMPTOMS.find(s => s.id === symptomId);
-                        return symptomObj ? escapeHTML(symptomObj.label) : escapeHTML(symptomId);
-                    })
-                    : [];
-                const symptomeList = symptomeLabels.length > 0
-                    ? `<ul>${symptomeLabels.map(label => `<li>${label}</li>`).join('')}</ul>`
-                    : '<p>Keine Symptome angegeben.</p>';
-                panikDetailsHTML = `
-                    <h4>Panikanfall Details:</h4>
-                    <p><strong>Beginn:</strong> ${escapeHTML(entry.panikBeginn) || 'N/A'}</p>
-                    <p><strong>Ende:</strong> ${escapeHTML(entry.panikEnde) || 'N/A'}</p>
-                    <p><strong>Intensität:</strong> ${escapeHTML(entry.panikIntensitaet) || '0'}/100</p>
-                    <p><strong>Symptome:</strong></p>
-                    ${symptomeList}
-                    <p><strong>Situation:</strong> ${escapeHTML(entry.panikSituation) || 'N/A'}</p>
-                    <p><strong>Auslöser:</strong> ${escapeHTML(entry.panikAusloeser) || 'N/A'}</p>
-                `;
-            }
-
-            entryCard.innerHTML = `
+            // Create Summary Div (always visible and clickable)
+            const summaryDiv = document.createElement('div');
+            summaryDiv.className = 'entry-summary';
+            summaryDiv.innerHTML = `
                 <h3>${displayDate}</h3>
-                <p class="text-xs text-gray-400 mb-2">Eingereicht am: ${new Date(entry.submittedAt).toLocaleString('de-DE')}</p>
+                <p class="submission-time">Eingereicht um ${submissionTime} Uhr</p>
+                <span class="toggle-indicator">Details anzeigen</span>
+            `;
+
+            // Create Details Div (initially hidden)
+            const detailsDiv = document.createElement('div');
+            detailsDiv.className = 'entry-details';
+            // Populate detailsDiv.innerHTML 
+            let detailsHTML = `
                 <p><strong>Stimmung:</strong> ${escapeHTML(entry.stimmung)}/100</p>
                 <p><strong>Energieniveau:</strong> ${escapeHTML(entry.energieniveau)}/100</p>
                 <p><strong>Körperl. Wohlbefinden:</strong> ${escapeHTML(entry.koerperlichesWohlbefinden)}/100</p>
@@ -242,14 +227,61 @@ async function displayEntries() {
                 <p><strong>Unruhe:</strong> ${escapeHTML(entry.unruhe)}/100</p>
                 <p><strong>Traurigkeit:</strong> ${escapeHTML(entry.traurigkeit)}/100</p>
                 <p><strong>Einsamkeit:</strong> ${escapeHTML(entry.einsamkeit)}/100</p>
+                <h4>Schlaf:</h4>
+                <p><strong>Schlafen gegangen:</strong> ${escapeHTML(entry.schlafStart) || 'N/A'}</p>
+                <p><strong>Aufgewacht:</strong> ${escapeHTML(entry.schlafEnde) || 'N/A'}</p>
+                <p><strong>Schlafqualität:</strong> ${escapeHTML(entry.schlafQualitaet) || 'N/A'}/100</p>
+                <p><strong>Wie oft aufgewacht:</strong> ${escapeHTML(entry.schlafAufgewacht) || 'N/A'}</p>
                 <h4>Vermiedene Situationen:</h4>
                 <p><strong>Vermieden:</strong> ${entry.situationenVermieden === 'ja' ? 'Ja' : 'Nein'}</p>
                 ${entry.situationenVermieden === 'ja' ? `<p><strong>Welche:</strong> ${escapeHTML(entry.vermiedenWelche) || 'N/A'}</p>` : ''}
-                <h4>Panikanfall:</h4>
-                <p><strong>Erlebt:</strong> ${entry.panikanfallErlebt === 'ja' ? 'Ja' : 'Nein'}</p>
-                ${panikDetailsHTML}
             `;
+
+            let panikDetailsGesamtHTML = `<h4>Panikattacken:</h4>`;
+            const anzahlPanik = parseInt(entry.anzahlPanikattacken, 10);
+            if (anzahlPanik > 0 && entry.panikattackenDetails && entry.panikattackenDetails.length > 0) {
+                panikDetailsGesamtHTML += `<p><strong>Anzahl berichtet:</strong> ${anzahlPanik === 4 ? '4 oder mehr' : anzahlPanik}</p>`;
+                entry.panikattackenDetails.forEach((attack, index) => {
+                    const symptomeLabels = attack.symptome && attack.symptome.length > 0
+                        ? attack.symptome.map(symptomId => {
+                            const symptomObj = PANIC_SYMPTOMS.find(s => s.id === symptomId);
+                            return symptomObj ? escapeHTML(symptomObj.label) : escapeHTML(symptomId);
+                        })
+                        : [];
+                    const symptomeList = symptomeLabels.length > 0
+                        ? `<ul>${symptomeLabels.map(label => `<li>${label}</li>`).join('')}</ul>`
+                        : '<p>Keine spezifischen Symptome angegeben.</p>';
+
+                    panikDetailsGesamtHTML += `
+                        <div class="panic-attack-report mt-2">
+                            <h5>Panikanfall ${index + 1}:</h5>
+                            <p><strong>Beginn:</strong> ${escapeHTML(attack.beginn) || 'N/A'}</p>
+                            <p><strong>Ende:</strong> ${escapeHTML(attack.ende) || 'N/A'}</p>
+                            <p><strong>Intensität:</strong> ${escapeHTML(attack.intensitaet) || '0'}/100</p>
+                            <p><strong>Symptome:</strong></p>
+                            ${symptomeList}
+                            <p><strong>Situation:</strong> ${escapeHTML(attack.situation) || 'N/A'}</p>
+                            <p><strong>Auslöser:</strong> ${escapeHTML(attack.ausloeser) || 'N/A'}</p>
+                        </div>
+                    `;
+                });
+            } else {
+                panikDetailsGesamtHTML += `<p>Keine Panikattacken berichtet.</p>`;
+            }
+            detailsHTML += panikDetailsGesamtHTML;
+            detailsDiv.innerHTML = detailsHTML;
+
+            // Append summary and details to the card
+            entryCard.appendChild(summaryDiv);
+            entryCard.appendChild(detailsDiv);
             entriesListDiv.appendChild(entryCard);
+
+            // Add click listener to toggle details
+            summaryDiv.addEventListener('click', () => {
+                const isHidden = detailsDiv.style.display === 'none';
+                detailsDiv.style.display = isHidden ? 'block' : 'none';
+                summaryDiv.querySelector('.toggle-indicator').textContent = isHidden ? 'Details verbergen' : 'Details anzeigen';
+            });
         });
     };
     getAllRequest.onerror = (event) => {
@@ -259,9 +291,9 @@ async function displayEntries() {
     };
 }
 
+
 // --- Downloading Data ---
 const downloadButton = document.getElementById('downloadData');
-
 async function downloadEntries() {
     if (!db) {
         showMessage('Datenbank nicht initialisiert. Daten können nicht heruntergeladen werden.', 'error');
@@ -298,7 +330,6 @@ async function downloadEntries() {
 // --- Message Display ---
 const messageBox = document.getElementById('message-box');
 let messageTimeout;
-
 function showMessage(text, type = 'info') {
     if (!messageBox) return;
     messageBox.textContent = text;
@@ -323,12 +354,10 @@ function registerServiceWorker() {
                 .then(registration => console.log('ServiceWorker: Registrierung erfolgreich, Scope:', registration.scope))
                 .catch(error => {
                     console.log('ServiceWorker: Registrierung fehlgeschlagen:', error);
-                    // showMessage('Service Worker konnte nicht für Offline-Nutzung registriert werden.', 'error'); // Can be noisy
                 });
         });
     } else {
          console.warn('Service Worker werden von diesem Browser nicht unterstützt.');
-         // showMessage('Service Worker werden von diesem Browser nicht unterstützt.', 'info');
     }
 }
 
@@ -350,13 +379,69 @@ function setupConditionalFields() {
         });
     }
 
-    const panikRadios = document.querySelectorAll('input[name="panikanfallErlebt"]');
-    const panikDetailsDiv = document.getElementById('panikDetails');
-     if (panikRadios.length && panikDetailsDiv) {
-        panikRadios.forEach(radio => {
-            radio.addEventListener('change', (event) => {
-                panikDetailsDiv.style.display = event.target.value === 'ja' ? 'block' : 'none';
-            });
+    if (anzahlPanikattackenSelect && panikattackenBerichteContainer) {
+        anzahlPanikattackenSelect.addEventListener('change', (event) => {
+            let count = parseInt(event.target.value, 10);
+            if (count >= 4) count = 4; 
+
+            panikattackenBerichteContainer.innerHTML = ''; 
+            if (count > 0) {
+                panikattackenBerichteContainer.style.display = 'block';
+                for (let i = 1; i <= count; i++) {
+                    const reportDiv = document.createElement('div');
+                    reportDiv.className = 'panic-attack-report space-y-4';
+
+                    let symptomCheckboxesHTML = '<div class="symptom-grid">';
+                    PANIC_SYMPTOMS.forEach(symptom => {
+                        symptomCheckboxesHTML += `
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" name="panikSymptome_${i}" value="${symptom.id}" class="form-checkbox text-blue-600 h-4 w-4 rounded">
+                                <span class="ml-2 text-sm text-gray-700">${escapeHTML(symptom.label)}</span>
+                            </label>
+                        `;
+                    });
+                    symptomCheckboxesHTML += '</div>';
+
+                    reportDiv.innerHTML = `
+                        <h5 class="text-md font-semibold text-blue-600">Details zu Panikanfall ${i}</h5>
+                        <div>
+                            <label for="panikBeginn_${i}" class="block text-sm font-medium text-gray-700">a. Zu welcher Zeit fing er ungefähr an?</label>
+                            <input type="time" id="panikBeginn_${i}" name="panikBeginn_${i}"
+                                   class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="panikEnde_${i}" class="block text-sm font-medium text-gray-700">b. Wann hörte er ungefähr auf?</label>
+                            <input type="time" id="panikEnde_${i}" name="panikEnde_${i}"
+                                   class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="panikIntensitaet_${i}" class="block text-sm font-medium text-gray-700">c. Wie hoch würden Sie die Intensität des Panikanfalls einschätzen? (0-100)</label>
+                            <div class="slider-container">
+                                <input type="range" id="panikIntensitaet_${i}" name="panikIntensitaet_${i}" min="0" max="100" value="0" class="w-full">
+                                 <output for="panikIntensitaet_${i}">0</output>
+                            </div>
+                        </div>
+                         <div>
+                            <label class="block text-sm font-medium text-gray-700">d. Bitte kreuzen Sie die Symptome an, die Sie während des Panikanfalls erlebt haben:</label>
+                            ${symptomCheckboxesHTML}
+                        </div>
+                        <div>
+                            <label for="panikSituation_${i}" class="block text-sm font-medium text-gray-700">e. Bitte beschreiben Sie die Situation, in der der Panikanfall auftrat, genauer:</label>
+                            <textarea id="panikSituation_${i}" name="panikSituation_${i}" rows="3" placeholder="z.B. alleine oder mit anderen, privater oder öffentlicher Raum..."
+                                      class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                        </div>
+                        <div>
+                            <label for="panikAusloeser_${i}" class="block text-sm font-medium text-gray-700">f. Was glauben Sie hat Ihren Panikanfall ausgelöst?</label>
+                            <textarea id="panikAusloeser_${i}" name="panikAusloeser_${i}" rows="3" placeholder="Mögliche Auslöser..."
+                                      class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                        </div>
+                    `;
+                    panikattackenBerichteContainer.appendChild(reportDiv);
+                }
+                setupSliderOutputs(); 
+            } else {
+                panikattackenBerichteContainer.style.display = 'none';
+            }
         });
     }
 }
@@ -366,7 +451,7 @@ function setupSliderOutputs() {
     sliders.forEach(slider => {
         const output = document.querySelector(`output[for="${slider.id}"]`);
         if (output) {
-            output.value = slider.value;
+            output.value = slider.value; 
             slider.addEventListener('input', (event) => {
                 output.value = event.target.value;
             });
@@ -387,9 +472,7 @@ function updateNotificationStatusUI() {
        }
         return;
     }
-
     const effectivelyDisabled = localStorage.getItem('notificationsEffectivelyDisabled') === 'true';
-
     switch (Notification.permission) {
         case 'granted':
             if (effectivelyDisabled) {
@@ -398,7 +481,7 @@ function updateNotificationStatusUI() {
                 enableNotificationsBtn.classList.remove('btn-secondary');
                 enableNotificationsBtn.classList.add('btn-neutral');
             } else {
-                notificationStatusP.textContent = 'Status: Tägliche Erinnerungen sind aktiviert.';
+                notificationStatusP.textContent = 'Status: Tägliche Erinnerungen sind aktiviert (12:00 & 20:00 Uhr).';
                 enableNotificationsBtn.textContent = 'Erinnerungen Pausieren';
                 enableNotificationsBtn.classList.remove('btn-neutral');
                 enableNotificationsBtn.classList.add('btn-secondary');
@@ -410,7 +493,7 @@ function updateNotificationStatusUI() {
             enableNotificationsBtn.disabled = true;
             enableNotificationsBtn.textContent = 'Blockiert';
             break;
-        default: // 'default'
+        default: 
             notificationStatusP.textContent = 'Status: Tägliche Erinnerungen sind nicht aktiviert.';
             enableNotificationsBtn.textContent = 'Tägliche Erinnerungen Aktivieren';
             enableNotificationsBtn.disabled = false;
@@ -425,13 +508,12 @@ async function requestNotificationPermission() {
         updateNotificationStatusUI();
         return;
     }
-
     if (Notification.permission === 'granted') {
         const effectivelyDisabled = localStorage.getItem('notificationsEffectivelyDisabled') === 'true';
         if (effectivelyDisabled) {
             localStorage.removeItem('notificationsEffectivelyDisabled');
-            showMessage('Tägliche Erinnerungen werden wieder angezeigt.', 'success');
-            checkAndTriggerDailyNotification(); 
+            showMessage('Tägliche Erinnerungen (12 & 20 Uhr) werden wieder angezeigt.', 'success');
+            checkAndTriggerScheduledNotifications(); 
         } else {
             localStorage.setItem('notificationsEffectivelyDisabled', 'true');
             showMessage('Tägliche Erinnerungen pausiert.', 'info');
@@ -439,19 +521,17 @@ async function requestNotificationPermission() {
         updateNotificationStatusUI();
         return;
     }
-    
     if (Notification.permission === 'denied') {
          showMessage('Benachrichtigungen wurden blockiert. Sie müssen die Berechtigung in Ihren Browsereinstellungen manuell erteilen.', 'error');
          updateNotificationStatusUI();
          return;
     }
-
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
-        showMessage('Tägliche Erinnerungen erfolgreich aktiviert!', 'success');
+        showMessage('Tägliche Erinnerungen (12 & 20 Uhr) erfolgreich aktiviert!', 'success');
         localStorage.setItem('notificationPermissionGranted', 'true'); 
         localStorage.removeItem('notificationsEffectivelyDisabled');
-        checkAndTriggerDailyNotification(); 
+        checkAndTriggerScheduledNotifications(); 
     } else if (permission === 'denied') {
         showMessage('Erinnerungen wurden nicht aktiviert, da die Berechtigung verweigert wurde.', 'info');
         localStorage.setItem('notificationPermissionGranted', 'false');
@@ -461,9 +541,9 @@ async function requestNotificationPermission() {
     updateNotificationStatusUI();
 }
 
-function sendNotificationToSW() {
+function sendNotificationToSW(title, body) {
     if (localStorage.getItem('notificationsEffectivelyDisabled') === 'true') {
-        console.log('Notifications are conceptually disabled by user. Skipping SW message.');
+        console.log('Notifications are effectively disabled by user. Skipping SW message.');
         return;
     }
     if (!navigator.serviceWorker.controller) {
@@ -472,39 +552,47 @@ function sendNotificationToSW() {
     }
     navigator.serviceWorker.controller.postMessage({
         action: 'showDailyNotification',
-        title: 'Tägliches Journal',
-        body: 'Zeit für deinen heutigen Journaleintrag! ✏️',
-        icon: 'icons/icon-192x192.png' 
+        title: title,
+        body: body,
+        icon: '/image/logo.png' 
     });
 }
 
-function checkAndTriggerDailyNotification() {
+function checkAndTriggerScheduledNotifications() {
     if (Notification.permission !== 'granted' || localStorage.getItem('notificationsEffectivelyDisabled') === 'true') {
-        console.log('Notification permission not granted or conceptually disabled. Skipping daily check.');
+        console.log('Notification permission not granted or effectively disabled. Skipping scheduled check.');
         return;
     }
-
-    const todayStr = new Date().toISOString().split('T')[0];
-    const lastNotificationDate = localStorage.getItem('lastNotificationShownDate');
     const now = new Date();
-    const notificationHour = 10; // Example: 10 AM
+    const todayStr = now.toISOString().split('T')[0];
+    const currentHour = now.getHours();
+    const noonHour = 12;
+    const eveningHour = 20;
 
-    if (lastNotificationDate !== todayStr && now.getHours() >= notificationHour) {
-        console.log('Triggering daily notification for', todayStr);
-        sendNotificationToSW();
-        localStorage.setItem('lastNotificationShownDate', todayStr);
-    } else if (lastNotificationDate === todayStr) {
-        console.log('Daily notification already shown for', todayStr);
-    } else {
-        console.log('Not yet time for daily notification (or already shown). Current hour:', now.getHours());
+    const lastNoonNotificationDate = localStorage.getItem('lastNoonNotificationShownDate');
+    if (currentHour >= noonHour && lastNoonNotificationDate !== todayStr) {
+        console.log('Triggering Noon notification for', todayStr);
+        sendNotificationToSW('Tägliches Journal - Mittag', 'Zeit für deinen Mittags-Journaleintrag! ✏️');
+        localStorage.setItem('lastNoonNotificationShownDate', todayStr);
+    } else if (lastNoonNotificationDate === todayStr) {
+        console.log('Noon notification already shown for', todayStr);
+    }
+
+    const lastEveningNotificationDate = localStorage.getItem('lastEveningNotificationShownDate');
+    if (currentHour >= eveningHour && lastEveningNotificationDate !== todayStr) {
+        console.log('Triggering Evening notification for', todayStr);
+        sendNotificationToSW('Tägliches Journal - Abend', 'Zeit für deinen Abend-Journaleintrag! ✏️');
+        localStorage.setItem('lastEveningNotificationShownDate', todayStr);
+    } else if (lastEveningNotificationDate === todayStr) {
+        console.log('Evening notification already shown for', todayStr);
     }
 }
 
 function initialNotificationCheck() {
     updateNotificationStatusUI(); 
     if (Notification.permission === 'granted') {
-        checkAndTriggerDailyNotification();
-        setInterval(checkAndTriggerDailyNotification, 30 * 60 * 1000); // Check every 30 minutes
+        checkAndTriggerScheduledNotifications(); 
+        setInterval(checkAndTriggerScheduledNotifications, 15 * 60 * 1000); 
     }
 }
 
@@ -512,15 +600,14 @@ function initialNotificationCheck() {
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('DOMContentLoaded event fired. Initializing application...');
     try {
-        await initDB(); // Wait for DB to be ready
+        await initDB(); 
         setDefaultDate();
-        generateSymptomCheckboxes(); // Generate checkboxes
-        displayEntries(); // Display any existing entries
+        displayEntries(); 
         registerServiceWorker();
         setCurrentYear();
-        setupConditionalFields(); // Setup hide/show logic for form sections
-        setupSliderOutputs(); // Setup slider value displays
-        initialNotificationCheck(); // Setup and check notifications
+        setupConditionalFields(); 
+        setupSliderOutputs(); 
+        initialNotificationCheck(); 
 
         if (dailyForm) {
             dailyForm.addEventListener('submit', addEntry);

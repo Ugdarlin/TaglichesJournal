@@ -12,7 +12,7 @@
         body {
             font-family: 'Inter', sans-serif;
         }
-        .form-container, .entries-container, .actions-container, .notifications-container { /* Added notifications-container */
+        .form-container, .entries-container, .actions-container, .notifications-container {
             @apply bg-white p-6 rounded-lg shadow-md mb-6;
         }
         .btn {
@@ -24,24 +24,47 @@
         .btn-secondary {
             @apply bg-green-500 hover:bg-green-600;
         }
-        .btn-neutral { /* Added neutral button style */
+        .btn-neutral {
             @apply bg-gray-500 hover:bg-gray-600;
         }
+
+        /* Entry card styling for collapsible view */
         .entry-card {
-            @apply bg-gray-50 p-4 rounded-md mb-4 shadow;
+            @apply bg-gray-50 rounded-lg shadow mb-4 overflow-hidden; /* Added overflow-hidden */
         }
-        .entry-card h3 {
-            @apply text-xl font-semibold text-blue-700 mb-2;
+        .entry-summary {
+            @apply p-4 cursor-pointer hover:bg-gray-100 transition-colors duration-150;
         }
-        .entry-card h4 {
+        .entry-summary h3 {
+            @apply text-xl font-semibold text-blue-700 mb-1;
+        }
+        .entry-summary .submission-time {
+            @apply text-xs text-gray-500 mb-1;
+        }
+        .entry-summary .toggle-indicator {
+            @apply text-xs text-blue-600 mt-1 block;
+        }
+        .entry-details {
+            @apply p-4 border-t border-gray-200 bg-white; 
+            display: none;
+        }
+        .entry-details h4 {
             @apply text-md font-semibold text-gray-700 mt-3 mb-1;
         }
-        .entry-card p {
+        .entry-details p {
             @apply text-sm text-gray-600 mb-1;
         }
-        .entry-card ul {
+        .entry-details ul {
             @apply list-disc list-inside pl-4 text-sm text-gray-600;
         }
+        .entry-details .panic-attack-report { 
+             @apply mt-3 p-3 border border-dashed border-blue-200 rounded-md bg-blue-50;
+        }
+        .entry-details .panic-attack-report h5 {
+            @apply text-base font-semibold text-blue-700 mb-2;
+        }
+
+
         #message-box {
             @apply fixed top-5 right-5 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-md shadow-lg z-50;
             display: none;
@@ -53,7 +76,7 @@
             @apply bg-blue-100 border-blue-400 text-blue-700;
         }
         .slider-container {
-            @apply flex items-center space-x-2;
+            @apply flex items-center space-x-2 mt-1;
         }
         .slider-container input[type="range"] {
             @apply flex-grow;
@@ -64,6 +87,15 @@
         .hidden-section {
             display: none;
             @apply mt-3 p-3 border border-gray-200 rounded-md bg-gray-50;
+        }
+        .panic-attack-report { /* General styling for form section, details section has more specific one */
+            @apply mt-4 p-4 border border-dashed border-blue-200 rounded-lg bg-blue-50;
+        }
+        .panic-attack-report h5 {
+             @apply text-lg font-semibold text-blue-700 mb-3;
+        }
+        .symptom-grid {
+            @apply grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 mt-2;
         }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -98,68 +130,88 @@
                 <div>
                     <label for="stimmung" class="block text-sm font-medium text-gray-700">1. Wie würden Sie Ihre aktuelle Stimmung gerade beschreiben?</label>
                     <span class="text-xs text-gray-500">(0=sehr schlecht, 100=sehr gut)</span>
-                    <div class="slider-container mt-1">
+                    <div class="slider-container">
                         <input type="range" id="stimmung" name="stimmung" min="0" max="100" value="50" class="w-full">
                         <output for="stimmung">50</output>
                     </div>
                 </div>
-
                 <div>
                     <label for="energieniveau" class="block text-sm font-medium text-gray-700">2. Wie würden Sie Ihr Energieniveau gerade beschreiben?</label>
                     <span class="text-xs text-gray-500">(0=sehr erschöpft/ausgelaugt, 100=total energiegeladen)</span>
-                    <div class="slider-container mt-1">
+                    <div class="slider-container">
                         <input type="range" id="energieniveau" name="energieniveau" min="0" max="100" value="50" class="w-full">
                         <output for="energieniveau">50</output>
                     </div>
                 </div>
-
                 <div>
                     <label for="koerperlichesWohlbefinden" class="block text-sm font-medium text-gray-700">3. Wie würden Sie Ihr körperliches Wohlbefinden gerade beschreiben?</label>
                     <span class="text-xs text-gray-500">(0=sehr schlecht, 100=sehr gut)</span>
-                    <div class="slider-container mt-1">
+                    <div class="slider-container">
                         <input type="range" id="koerperlichesWohlbefinden" name="koerperlichesWohlbefinden" min="0" max="100" value="50" class="w-full">
                         <output for="koerperlichesWohlbefinden">50</output>
                     </div>
                 </div>
-                
                 <div>
                     <label for="nervositaet" class="block text-sm font-medium text-gray-700">4. Wie nervös fühlen Sie sich gerade?</label>
                      <span class="text-xs text-gray-500">(0=gar nicht, 100=extrem)</span>
-                    <div class="slider-container mt-1">
+                    <div class="slider-container">
                         <input type="range" id="nervositaet" name="nervositaet" min="0" max="100" value="0" class="w-full">
                         <output for="nervositaet">0</output>
                     </div>
                 </div>
-
                 <div>
                     <label for="unruhe" class="block text-sm font-medium text-gray-700">5. Wie unruhig fühlen Sie sich gerade?</label>
                     <span class="text-xs text-gray-500">(0=gar nicht, 100=extrem)</span>
-                    <div class="slider-container mt-1">
+                    <div class="slider-container">
                         <input type="range" id="unruhe" name="unruhe" min="0" max="100" value="0" class="w-full">
                         <output for="unruhe">0</output>
                     </div>
                 </div>
-
                 <div>
                     <label for="traurigkeit" class="block text-sm font-medium text-gray-700">6. Wie traurig fühlen Sie sich gerade?</label>
                     <span class="text-xs text-gray-500">(0=gar nicht, 100=extrem)</span>
-                    <div class="slider-container mt-1">
+                    <div class="slider-container">
                         <input type="range" id="traurigkeit" name="traurigkeit" min="0" max="100" value="0" class="w-full">
                         <output for="traurigkeit">0</output>
                     </div>
                 </div>
-
                 <div>
                     <label for="einsamkeit" class="block text-sm font-medium text-gray-700">7. Wie einsam fühlen Sie sich gerade?</label>
                     <span class="text-xs text-gray-500">(0=gar nicht, 100=extrem)</span>
-                    <div class="slider-container mt-1">
+                    <div class="slider-container">
                         <input type="range" id="einsamkeit" name="einsamkeit" min="0" max="100" value="0" class="w-full">
                         <output for="einsamkeit">0</output>
                     </div>
                 </div>
 
+                <h3 class="text-lg font-semibold text-gray-700 mt-6 mb-3 border-t pt-4">Schlaf</h3>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">8. Haben Sie seit der letzten Befragung bestimmte Situationen vermieden?</label>
+                    <label for="schlafStart" class="block text-sm font-medium text-gray-700">8. Um wie viel Uhr sind Sie gestern schlafen gegangen?</label>
+                    <input type="time" id="schlafStart" name="schlafStart"
+                           class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                </div>
+                <div>
+                    <label for="schlafEnde" class="block text-sm font-medium text-gray-700">9. Um wie viel Uhr sind Sie heute aufgewacht?</label>
+                    <input type="time" id="schlafEnde" name="schlafEnde"
+                           class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                </div>
+                <div>
+                    <label for="schlafQualitaet" class="block text-sm font-medium text-gray-700">10. Wie würden Sie die Schlafqualität in der letzten Nacht beschreiben?</label>
+                    <span class="text-xs text-gray-500">(0=sehr schlecht, 100=sehr gut)</span>
+                    <div class="slider-container">
+                        <input type="range" id="schlafQualitaet" name="schlafQualitaet" min="0" max="100" value="75" class="w-full">
+                        <output for="schlafQualitaet">75</output>
+                    </div>
+                </div>
+                <div>
+                    <label for="schlafAufgewacht" class="block text-sm font-medium text-gray-700">11. Wie oft sind Sie Ihrer Erinnerung nach in der Nacht aufgewacht?</label>
+                    <input type="number" id="schlafAufgewacht" name="schlafAufgewacht" min="0" placeholder="Anzahl"
+                           class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                </div>
+
+                <h3 class="text-lg font-semibold text-gray-700 mt-6 mb-3 border-t pt-4">Vermeidungsverhalten</h3>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">12. Haben Sie seit der letzten Befragung bestimmte Situationen vermieden?</label>
                     <div class="mt-2 space-x-4">
                         <label class="inline-flex items-center">
                             <input type="radio" name="situationenVermieden" value="ja" class="form-radio text-blue-600">
@@ -177,53 +229,20 @@
                     </div>
                 </div>
 
+                <h3 class="text-lg font-semibold text-gray-700 mt-6 mb-3 border-t pt-4">Panikattacken</h3>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">9. Hatten Sie seit der letzten Befragung einen Panikanfall erlebt?</label>
-                    <div class="mt-2 space-x-4">
-                        <label class="inline-flex items-center">
-                            <input type="radio" name="panikanfallErlebt" value="ja" class="form-radio text-blue-600">
-                            <span class="ml-2">Ja</span>
-                        </label>
-                        <label class="inline-flex items-center">
-                            <input type="radio" name="panikanfallErlebt" value="nein" class="form-radio text-blue-600" checked>
-                            <span class="ml-2">Nein</span>
-                        </label>
-                    </div>
-                    <div id="panikDetails" class="hidden-section mt-2 space-y-3">
-                        <div>
-                            <label for="panikBeginn" class="block text-sm font-medium text-gray-700">a. Wenn ja, zu welcher Zeit fing er ungefähr an?</label>
-                            <input type="time" id="panikBeginn" name="panikBeginn"
-                                   class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                        </div>
-                        <div>
-                            <label for="panikEnde" class="block text-sm font-medium text-gray-700">b. Wann hörte er ungefähr auf?</label>
-                            <input type="time" id="panikEnde" name="panikEnde"
-                                   class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                        </div>
-                        <div>
-                            <label for="panikIntensitaet" class="block text-sm font-medium text-gray-700">c. Wie hoch würden Sie die Intensität des Panikanfalls einschätzen? (0-100)</label>
-                            <div class="slider-container mt-1">
-                                <input type="range" id="panikIntensitaet" name="panikIntensitaet" min="0" max="100" value="0" class="w-full">
-                                 <output for="panikIntensitaet">0</output>
-                            </div>
-                        </div>
-                         <div>
-                            <label class="block text-sm font-medium text-gray-700">d. Bitte kreuzen Sie die Symptome an, die Sie während des Panikanfalls erlebt haben:</label>
-                            <div id="panikSymptomeCheckboxesContainer" class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                </div>
-                        </div>
-                        <div>
-                            <label for="panikSituation" class="block text-sm font-medium text-gray-700">e. Bitte beschreiben Sie die Situation, in der der Panikanfall auftrat, genauer:</label>
-                            <textarea id="panikSituation" name="panikSituation" rows="3" placeholder="z.B. alleine oder mit anderen, privater oder öffentlicher Raum..."
-                                      class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
-                        </div>
-                        <div>
-                            <label for="panikAusloeser" class="block text-sm font-medium text-gray-700">f. Was glauben Sie hat Ihren Panikanfall ausgelöst?</label>
-                            <textarea id="panikAusloeser" name="panikAusloeser" rows="3" placeholder="Mögliche Auslöser..."
-                                      class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
-                        </div>
-                    </div>
+                    <label for="anzahlPanikattacken" class="block text-sm font-medium text-gray-700">13. Wie viele Panikattacken hatten Sie seit der letzten Befragung?</label>
+                    <select id="anzahlPanikattacken" name="anzahlPanikattacken"
+                            class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        <option value="0">Keine</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4 oder mehr</option>
+                    </select>
                 </div>
+                <div id="panikattackenBerichteContainer" class="space-y-6">
+                    </div>
 
                 <button type="submit" class="btn btn-primary w-full !mt-8">Eintrag Speichern</button>
             </form>
@@ -246,6 +265,5 @@
         <p>&copy; <span id="currentYear"></span> Tägliches Journal PWA. Alle Rechte vorbehalten.</p>
     </footer>
 
-    <script src="app.js"></script>
-</body>
+    <script src="app.js"></script></body>
 </html>
