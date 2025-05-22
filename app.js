@@ -350,7 +350,7 @@ function showMessage(text, type = 'info') {
 function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js')
+            navigator.serviceWorker.register('/TaglichesJournal/sw.js')
                 .then(registration => console.log('ServiceWorker: Registrierung erfolgreich, Scope:', registration.scope))
                 .catch(error => {
                     console.log('ServiceWorker: Registrierung fehlgeschlagen:', error);
